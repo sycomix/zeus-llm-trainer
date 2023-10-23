@@ -164,15 +164,15 @@ def train(
     ), "Please specify a --base_model, e.g. --base_model='elinas/llama-7b-hf-transformers-4.29'"
 
     # Check if parameter passed or if set within environ
-    use_wandb = len(wandb_project) > 0 or (
+    use_wandb = wandb_project != "" or (
         "WANDB_PROJECT" in os.environ and len(os.environ["WANDB_PROJECT"]) > 0
     )
     # Only overwrite environ if wandb param passed
-    if len(wandb_project) > 0:
+    if wandb_project != "":
         os.environ["WANDB_PROJECT"] = wandb_project
-    if len(wandb_watch) > 0:
+    if wandb_watch != "":
         os.environ["WANDB_WATCH"] = wandb_watch
-    if len(wandb_log_model) > 0:
+    if wandb_log_model != "":
         os.environ["WANDB_LOG_MODEL"] = wandb_log_model
 
     # check if the user wants to train in fp16 to adjust the way the model is loaded
@@ -280,7 +280,7 @@ def train(
         # keeps Trainer from trying its own DataParallelism when more than 1 gpu is available
         # TODO LOOK INTO THIS VS PASSING fsdp + fsdp_config
         #  https://huggingface.co/docs/transformers/main_classes/trainer#transformers.TrainingArguments.fsdp
-        if fsdp_params == "":
+        if not fsdp_params:
             model.is_parallelizable = True
             model.model_parallel = True
 
@@ -351,7 +351,7 @@ def train(
     if is_finetune:
         callbacks = None
 
-    if fsdp_params == '':
+    if not fsdp_params:
         fsdp_params = False
 
 
@@ -360,10 +360,10 @@ def train(
     args = transformers.TrainingArguments(
         per_device_train_batch_size=per_device_train_batch_size,
         gradient_accumulation_steps=gradient_accumulation_steps,
-        warmup_ratio=warmup_ratio,  # default 0.06 as recommended by MS LoRA
+        warmup_ratio=warmup_ratio,
         num_train_epochs=num_train_epochs,
         learning_rate=learning_rate,
-        fp16=True if not train_bf16 else False,  # mixed precision, bf16 seems like a good option as well
+        fp16=not train_bf16,
         bf16=train_bf16,
         logging_steps=logging_steps,
         optim=optim,
@@ -373,16 +373,14 @@ def train(
         save_steps=save_and_eval_steps,
         output_dir=output_dir,
         save_total_limit=save_total_limit,
-        load_best_model_at_end=True if val_set_size > 0 else False,
+        load_best_model_at_end=val_set_size > 0,
         ddp_find_unused_parameters=False if ddp else None,
         group_by_length=group_by_length,
-        # ddp_timeout=1800,
         report_to="wandb" if use_wandb else None,
         run_name=wandb_run_name if use_wandb else None,
         seed=seed,
-        max_grad_norm=max_grad_norm,  # if not use_xformers else max_grad_norm if max_grad_norm != 1.0 else 0.5
-        fsdp=fsdp_params
-        # **vars(training_args)
+        max_grad_norm=max_grad_norm,
+        fsdp=fsdp_params,
     )
     # accelerate.Accelerator(mixed_precision='fp8')
 
